@@ -154,6 +154,7 @@ function showPreview(): void {
 function showOptions() {
     let element = document.getElementById("options");
     if (element) {
+        element.classList.remove("slide-out-left");
         element.classList.add("show-options");
         element.classList.add("slide-in-left");
         element.classList.remove("d-none");
