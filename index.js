@@ -10,9 +10,32 @@ var FormatOption;
     FormatOption["LongDateTime"] = "Long Date/Time";
     FormatOption["RelativeTime"] = "Relative Time";
 })(FormatOption || (FormatOption = {}));
-function formatTimestamp(dateString, format) {
-    let date = new Date(dateString);
-    let timestamp = Math.floor(date.getTime() / 1000);
+let toastTimeout;
+function getElement(id, ctor) {
+    const element = document.getElementById(id);
+    if (!element || !(element instanceof ctor)) {
+        throw new Error(`Element #${id} not found or has an unexpected type.`);
+    }
+    return element;
+}
+function toLocalInputValue(date) {
+    const offsetMs = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offsetMs);
+    return localDate.toISOString().slice(0, 16);
+}
+function setInitialDate(dateInput) {
+    const now = new Date();
+    dateInput.value = toLocalInputValue(now);
+}
+function parseDate(value) {
+    if (!value) {
+        return null;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+function buildTimestamp(date, format) {
+    const timestamp = Math.floor(date.getTime() / 1000);
     switch (format) {
         case FormatOption.Default:
             return `<t:${timestamp}>`;
@@ -34,135 +57,132 @@ function formatTimestamp(dateString, format) {
             throw new Error("Invalid format option.");
     }
 }
-function generateTimestamp() {
-    let dateInputElement = document.getElementById("dateInput");
-    let formatOptionElement = document.getElementById("formatOption");
-    let resultElement = document.getElementById("result");
-    let copyButton = document.getElementById("copyButton");
-    if (dateInputElement && formatOptionElement && resultElement && copyButton) {
-        let dateInput = dateInputElement.value;
-        if (!dateInput) {
-            showToast("Please enter a date.");
-            dateInput = new Date().toISOString();
-        }
-        let formatOption = formatOptionElement.value;
-        let result = formatTimestamp(dateInput, formatOption);
-        resultElement.innerText = result;
-        copyButton.style.display = "inline";
-    }
-    else {
-        throw new Error("A required element was not found.");
-    }
-    showPreview();
-}
-function copyToClipboard() {
-    let resultElement = document.getElementById("result");
-    if (resultElement) {
-        let resultText = resultElement.innerText;
-        navigator.clipboard.writeText(resultText).then(() => {
-            showToast("Timestamp was copied to the clipboard!");
-        });
-    }
-    else {
-        throw new Error("Result element not found.");
-    }
-}
-function showToast(message) {
-    let toast = document.getElementById("toast");
-    if (toast) {
-        toast.innerText = message;
-        toast.className = "show";
-        setTimeout(() => {
-            toast.className = toast.className.replace("show", "");
-        }, 3000);
-    }
-    else {
-        throw new Error("Toast element not found.");
-    }
-}
-function formatDateForPreview(dateString, format) {
-    let date = new Date(dateString);
+function formatDateForPreview(date, format) {
     let options;
     switch (format) {
         case FormatOption.Default:
-            options = { dateStyle: 'medium', timeStyle: 'short' };
+            options = { dateStyle: "medium", timeStyle: "short" };
             break;
         case FormatOption.ShortTime:
-            options = { hour: '2-digit', minute: '2-digit' };
+            options = { hour: "2-digit", minute: "2-digit" };
             break;
         case FormatOption.LongTime:
-            options = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            options = { hour: "2-digit", minute: "2-digit", second: "2-digit" };
             break;
         case FormatOption.ShortDate:
-            options = { year: 'numeric', month: 'numeric', day: 'numeric' };
+            options = { year: "numeric", month: "numeric", day: "numeric" };
             break;
         case FormatOption.LongDate:
-            options = { year: 'numeric', month: 'long', day: 'numeric' };
+            options = { year: "numeric", month: "long", day: "numeric" };
             break;
         case FormatOption.ShortDateTime:
-            options = { dateStyle: 'short', timeStyle: 'short' };
+            options = { dateStyle: "short", timeStyle: "short" };
             break;
         case FormatOption.LongDateTime:
-            options = { dateStyle: 'full', timeStyle: 'long' };
+            options = { dateStyle: "full", timeStyle: "long" };
             break;
-        case FormatOption.RelativeTime:
-            let now = new Date();
-            let diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
-            let formatter = new Intl.RelativeTimeFormat('de', { numeric: 'auto' });
-            let relativeTime;
+        case FormatOption.RelativeTime: {
+            const now = new Date();
+            const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
+            const formatter = new Intl.RelativeTimeFormat("de", { numeric: "auto" });
             if (Math.abs(diffInSeconds) < 60) {
-                relativeTime = formatter.format(diffInSeconds, 'seconds');
+                return formatter.format(diffInSeconds, "seconds");
             }
-            else if (Math.abs(diffInSeconds) < 3600) {
-                relativeTime = formatter.format(Math.floor(diffInSeconds / 60), 'minutes');
+            if (Math.abs(diffInSeconds) < 3600) {
+                return formatter.format(Math.floor(diffInSeconds / 60), "minutes");
             }
-            else if (Math.abs(diffInSeconds) < 86400) {
-                relativeTime = formatter.format(Math.floor(diffInSeconds / 3600), 'hours');
+            if (Math.abs(diffInSeconds) < 86400) {
+                return formatter.format(Math.floor(diffInSeconds / 3600), "hours");
             }
-            else {
-                relativeTime = formatter.format(Math.floor(diffInSeconds / 86400), 'days');
-            }
-            return relativeTime;
-        default:
-            throw new Error("Ungültige Formatoption.");
-    }
-    return new Intl.DateTimeFormat('de-DE', options).format(date);
-}
-function showPreview() {
-    let dateInputElement = document.getElementById("dateInput");
-    let formatOptionElement = document.getElementById("formatOption");
-    let previewElement = document.getElementById("preview");
-    if (dateInputElement && formatOptionElement && previewElement) {
-        let dateInput = dateInputElement.value;
-        if (!dateInput) {
-            dateInput = new Date().toISOString();
+            return formatter.format(Math.floor(diffInSeconds / 86400), "days");
         }
-        let formatOption = formatOptionElement.value;
-        let formattedDate = formatDateForPreview(dateInput, formatOption);
-        previewElement.innerText = formattedDate;
+        default:
+            throw new Error("Invalid format option.");
     }
-    else {
-        showToast("Ein erforderliches Element wurde nicht gefunden.");
+    return new Intl.DateTimeFormat("de-DE", options).format(date);
+}
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    if (!toast) {
+        throw new Error("Toast element not found.");
+    }
+    toast.textContent = message;
+    toast.classList.add("show");
+    if (toastTimeout) {
+        window.clearTimeout(toastTimeout);
+    }
+    toastTimeout = window.setTimeout(() => {
+        toast.classList.remove("show");
+    }, 2500);
+}
+function updatePreview(ui, dateOverride) {
+    const chosenDate = dateOverride ?? parseDate(ui.dateInput.value);
+    if (!chosenDate) {
+        ui.preview.textContent = "Pick a date to see the preview.";
+        return;
+    }
+    const format = ui.formatOption.value;
+    const formattedDate = formatDateForPreview(chosenDate, format);
+    ui.preview.textContent = formattedDate;
+}
+function generateTimestamp(ui) {
+    let selectedDate = parseDate(ui.dateInput.value);
+    let usedNow = false;
+    if (!selectedDate) {
+        selectedDate = new Date();
+        ui.dateInput.value = toLocalInputValue(selectedDate);
+        usedNow = true;
+    }
+    const format = ui.formatOption.value;
+    const result = buildTimestamp(selectedDate, format);
+    ui.result.textContent = result;
+    ui.copyButton.disabled = false;
+    updatePreview(ui, selectedDate);
+    if (usedNow) {
+        showToast("No date entered, using the current time.");
     }
 }
-function showOptions() {
-    let element = document.getElementById("options");
-    if (element) {
-        element.classList.remove("slide-out-left");
-        element.classList.add("show-options");
-        element.classList.add("slide-in-left");
-        element.classList.remove("d-none");
+function copyToClipboard(ui) {
+    const resultText = ui.result.textContent?.trim();
+    if (!resultText) {
+        showToast("Nothing to copy yet.");
+        return;
     }
-}
-function hideOptions() {
-    let element = document.getElementById("options");
-    if (element) {
-        element.classList.remove("slide-in-left");
-        element.classList.add("slide-out-left");
-        setTimeout(() => {
-            element.classList.add("d-none");
-            element.classList.remove("show-options");
-            element.classList.remove("slide-out-left");
-        }, 500);
+    if (!navigator.clipboard) {
+        const tempInput = document.createElement("input");
+        tempInput.value = resultText;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        tempInput.remove();
+        showToast("Timestamp copied to clipboard.");
+        return;
     }
+    navigator.clipboard.writeText(resultText).then(() => showToast("Timestamp copied to clipboard."), () => showToast("Could not copy to clipboard."));
 }
+function init() {
+    const dateInput = getElement("dateInput", HTMLInputElement);
+    const formatOption = getElement("formatOption", HTMLSelectElement);
+    const result = getElement("result", HTMLElement);
+    const preview = getElement("preview", HTMLElement);
+    const copyButton = getElement("copyButton", HTMLButtonElement);
+    const generateButton = document.querySelector("[data-action='generate']");
+    if (!generateButton) {
+        throw new Error("Generate button not found.");
+    }
+    const ui = {
+        dateInput,
+        formatOption,
+        result,
+        preview,
+        copyButton,
+    };
+    setInitialDate(dateInput);
+    updatePreview(ui, parseDate(dateInput.value) ?? undefined);
+    dateInput.addEventListener("input", () => updatePreview(ui));
+    dateInput.addEventListener("change", () => updatePreview(ui));
+    formatOption.addEventListener("change", () => updatePreview(ui));
+    generateButton.addEventListener("click", () => generateTimestamp(ui));
+    copyButton.addEventListener("click", () => copyToClipboard(ui));
+}
+document.addEventListener("DOMContentLoaded", init);
