@@ -13,6 +13,13 @@
   --radius: 18px;
 }
 
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("scr/fonts/SpaceGrotesk-VariableFont_wght.ttf") format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 *,
 *::before,
 *::after {
